@@ -23,11 +23,35 @@ async function main() {
 
     // available borrwing eth-- conversion rate for dai
     const daiPrice = await getDAIPrice()
-    const amountDAIToBorrow =
-        (await availableBorrowsETH.toString()) * 0.95 * (1 / daiPrice.toNumber())
-    console.log(`You can borrow ${amountDAIToBorrow} DAI`)
+    const amountDAIToBorrow = availableBorrowsETH.toString() * 0.95 * (1 / daiPrice.toNumber())
+    const amountDAIToBorrowInWEI = ethers.utils.parseEther(amountDAIToBorrow.toString())
+    console.log(`You can borrow ${amountDAIToBorrow.toString()} DAI`)
 
     //* 2. Borrowing asset
+    const daiTokenAddress = "0x6b175474e89094c44da98b954eedeac495271d0f"
+    await borrowDai(daiTokenAddress, lendingPool, amountDAIToBorrowInWEI, deployer)
+    await getBorrowUserData(lendingPool, deployer)
+    await repay(amountDAIToBorrowInWEI, daiTokenAddress, lendingPool, deployer)
+    await getBorrowUserData(lendingPool, deployer)
+}
+
+async function repay(amount, daiAddress, lendingPool, account) {
+    await approveERC20(daiAddress, lendingPool.address, amount, account)
+    const repayTransaction = await lendingPool.repay(daiAddress, amount, 1, account)
+    await repayTransaction.wait(1)
+    console.log(`You have repaid...`)
+}
+
+async function borrowDai(daiAddress, lendingPool, amountDAIToBorrowInWEI, account) {
+    const borrowTransaction = await lendingPool.borrow(
+        daiAddress,
+        amountDAIToBorrowInWEI,
+        1,
+        0,
+        account
+    )
+    await borrowTransaction.wait(1)
+    console.log(`You have borrowed. `)
 }
 
 async function getDAIPrice() {
@@ -36,7 +60,7 @@ async function getDAIPrice() {
         "0x773616E4d11A78F511299002da57A0a94577F1f4"
     )
     const DAIprice = (await daiEthPriceFeed.latestRoundData())[1]
-    console.log(`DAI price: ${DAIprice}`)
+    console.log(`DAI price: ${DAIprice.toString()}`)
     return DAIprice
 }
 
@@ -63,8 +87,8 @@ async function getLendingPool(account) {
 
 async function approveERC20(erc20Address, spenderAddress, amountToSpend, account) {
     const erc20Token = await ethers.getContractAt("IERC20", erc20Address, account)
-    const transaction = await erc20Token.approve(spenderAddress, amountToSpend)
-    transaction.wait(1)
+    transaction = await erc20Token.approve(spenderAddress, amountToSpend)
+    await transaction.wait(1)
     console.log(`Approved....!!!!`)
 }
 
